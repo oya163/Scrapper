@@ -27,9 +27,12 @@ class Scrapper:
             }
         }
         
+        if not os.path.exists(self.SOURCE):
+            os.mkdir(self.SOURCE)
+
         
     def saveJson(self, filename=None):
-        fname = filename if filename else self.SOURCE+'.json' 
+        fname = os.path.join(self.SOURCE, filename+'.json')
         with open(fname, 'w', encoding='utf-8') as f:
             json.dump(self.dump, f, ensure_ascii=False, indent=4)
             
@@ -64,7 +67,9 @@ class Scrapper:
 
         for ind, (link, category) in enumerate(categoryList.items()):
             url = link
-#             self.dump['category']
+            
+            # Get category name in English
+            category_eng = url.split("/")[-1]
             
             r = urllib.request.urlopen(url).read()
             soup = BeautifulSoup(r, 'html.parser')
@@ -75,13 +80,13 @@ class Scrapper:
                     # verify that it is content page
                     if 'html' in data.find('a').get('href'):
                         headlineList.append((category, data.find('a').get('href')))
-            
-            self.dump['category'][str(ind)]['content'] = self.newsContents(headlineList)
-
-#             print(self.dump['content'])
                 
-            
-
+            result = self.newsContents(headlineList)
+            if len(result) > 0:
+                self.dump['category'] = result 
+                self.saveJson(category_eng)
+                
+                
 
     # retrieve the body for each headline
     def newsContents(self, headlineList):
@@ -102,41 +107,50 @@ class Scrapper:
             title_source = soup.find_all('div', {'class': ['article-header']})
             if title_source[0].find({'h1', 'h2'}) is not None:
                 news_title = title_source[0].find({'h1', 'h2'}).text
+    
+            author = soup.find('span',{'class': ['author']}).text
+            nep_date = soup.find('time',{'style': ['display:inline-block']}).text           
             
+            # Get only the content from 
+            # normal article of main page of each link
             body_content = soup.find('article', {'class': ['normal']})
-#             body_content = soup.find('div', {'class': ['description portrait']})
 
             news_body=' '
                 
+            # Some of the category has no content 
+            # like photo_feature or video
             if body_content:
                 for body in body_content.findAll('p'):
                     # check if it the body is empty
                     # exclude the javascript inside <p></p> tag
                     # exclude the duplicates from appending
-                    if str(body.text.encode('ascii', 'ignore'))!=""  \
-                        and 'script' not in str(body) \
-                        and body.text not in news_body:
+                    if str(body.text.encode('ascii', 'ignore'))!="" \
+                                    and 'script' not in str(body) \
+                                    and body.text not in news_body:
                         news_body += body.text
 
                 # Get date
                 split_url = url.split('/')
+                cat_eng = split_url[-5]
                 yy = split_url[-4]
                 mm = split_url[-3]
                 dd = split_url[-2]
                 published_date = mm+dd+yy
 
                 result = {
+                    'cat_eng' : cat_eng,
+                    'cat_nep' : category,
+                    'eng_date' : published_date,
+                    'nep_date' : nep_date,
+                    'author': author,
                     'title' : news_title,
                     'text' : news_body,
-                    'url' : url,
-                    'published_date' : published_date,
+                    'url' : url
                 }
 
                 news_dump[str(index)] = result
 
-                return news_dump
-            else:
-                return
+        return news_dump
             
 
 def main():
