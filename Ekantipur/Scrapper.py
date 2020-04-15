@@ -1,8 +1,13 @@
 # -*- coding: utf-8 -*-
-import sys
-import bs4 as bs
-import urllib
+
+from bs4 import BeautifulSoup
+import urllib.request
+from urllib.parse import urlparse
 import re
+import json
+import sys
+import os
+import requests
 
 class ReadOnlyClass(type):
     def __setattr__(self, name, value):
@@ -15,16 +20,26 @@ class Scrapper:
     def __init__(self, news_link='', source=''):
         self.NEWS_LINK = news_link
         self.SOURCE = source
-        self.TITLE = ''
-        self.BODY = ''
+        self.dump = {
+            'news_link' : self.NEWS_LINK,
+            'source' : self.SOURCE,
+            'category' : {
+            }
+        }
+        
+        
+    def saveJson(self, filename=None):
+        fname = filename if filename else self.SOURCE+'.json' 
+        with open(fname, 'w', encoding='utf-8') as f:
+            json.dump(self.dump, f, ensure_ascii=False, indent=4)
+            
 
     def extractContent(self):
-        r = urllib.urlopen(self.NEWS_LINK).read()
-        soup = bs.BeautifulSoup(r)
+        r = urllib.request.urlopen(self.NEWS_LINK).read()
+        soup = BeautifulSoup(r, 'html.parser')
         return self.parseContent(soup)
 
     def parseContent(self, content):
-        print ("====================== DISPLAYING THE CONTENTS ======================")
         self.extractCategory(content)
 
     def extractCategory(self, content):
@@ -33,74 +48,103 @@ class Scrapper:
 
         for paragraph in content.find_all('a'):
             link = paragraph.get('href')
+            
+            if link is not None and 'https' in link:
+                # To get all the main title page
+                # There is break in paragraph text
+                if paragraph.text == '':
+                    break
+                categoryOriginal[paragraph.get('href')] = paragraph.text
 
-            if link is not None:
-
-                match = re.match(r'/category/', link, re.M | re.I)
-                if match:
-                    categoryOriginal[paragraph.get('href').replace("/category/", "")] = paragraph.text
-
-        # {category , category_text}
-        #remove redundant category
-        for key, value in categoryOriginal.items():
-            if key not in categories.keys():
-                categories[key] = value
-        self.extractHeadline(categories)
+        self.extractHeadline(categoryOriginal)
 
 
     # retrieve headline for each category
     def extractHeadline(self, categoryList):
 
-        for category, category_value in categoryList.items():
-            url = ''
-            url = url.join((self.NEWS_LINK, '/category/', category))
-
-            print (
-            "################################### Category : %s ###################################" % (category_value))
-            r = urllib.urlopen(url).read()
-            soup = bs.BeautifulSoup(r)
+        for ind, (link, category) in enumerate(categoryList.items()):
+            url = link
+#             self.dump['category']
+            
+            r = urllib.request.urlopen(url).read()
+            soup = BeautifulSoup(r, 'html.parser')
 
             headlineList = []
-            for data in soup.find_all('div', {'class': ['item-wrap', 'wrap']}):
+            for data in soup.find_all('div', {'class': ['teaser offset']}):
                 if data.find('a') is not None:
                     # verify that it is content page
                     if 'html' in data.find('a').get('href'):
-                        headlineList.append(data.find('a').get('href'))
+                        headlineList.append((category, data.find('a').get('href')))
+            
+            self.dump['category'][str(ind)]['content'] = self.newsContents(headlineList)
 
-            self.newsContents(headlineList)
+#             print(self.dump['content'])
+                
+            
+
 
     # retrieve the body for each headline
     def newsContents(self, headlineList):
-
-        for index, headline in enumerate(headlineList):
-            print ("*********************************** Headline : %s **********************************" % (index + 1))
+        
+        news_dump = {}
+        for index, (category, half_link) in enumerate(headlineList):
+            
+            print ("*************** Category : {}, #: {} ********************".format(category, (index + 1)))
             url = ''
-            url = url.join((self.NEWS_LINK, headline))
-            r = urllib.urlopen(url).read()
-            soup = bs.BeautifulSoup(r)
+            
+            # [1:] because of extra / in half_link
+            url = url.join((self.NEWS_LINK, half_link[1:]))
+            print("Link :", url)
+            
+            r = urllib.request.urlopen(url).read()
+            soup = BeautifulSoup(r, 'html.parser')
+            
+            title_source = soup.find_all('div', {'class': ['article-header']})
+            if title_source[0].find({'h1', 'h2'}) is not None:
+                news_title = title_source[0].find({'h1', 'h2'}).text
+            
+            body_content = soup.find('article', {'class': ['normal']})
+#             body_content = soup.find('div', {'class': ['description portrait']})
 
-            title_source = soup.find_all('div', {'class': ['wrap', 'content-wrapper', 'maincontent']})
+            news_body=' '
+                
+            if body_content:
+                for body in body_content.findAll('p'):
+                    # check if it the body is empty
+                    # exclude the javascript inside <p></p> tag
+                    # exclude the duplicates from appending
+                    if str(body.text.encode('ascii', 'ignore'))!=""  \
+                        and 'script' not in str(body) \
+                        and body.text not in news_body:
+                        news_body += body.text
 
-            for title_ in title_source:
-                if title_.find({'h1', 'h2'}) is not None:
-                    self.TITLE = title_.find({'h1', 'h2'}).text
+                # Get date
+                split_url = url.split('/')
+                yy = split_url[-4]
+                mm = split_url[-3]
+                dd = split_url[-2]
+                published_date = mm+dd+yy
 
-            body_content = soup.find('div', {'class': 'content-wrapper'})
-            print ("Title : " + self.TITLE)
-            scrapper = Scrapper()
-            for body in body_content.find_all('p'):
-                # check if it the body is empty
-                # exclude the javascript inside <p></p> tag
-                if str(body.text.encode('ascii', 'ignore'))!=""  and 'script' not in str(body):
-                    scrapper.BODY += body.text
-            self.BODY = scrapper.BODY
-            print ("Body : " + self.BODY)
+                result = {
+                    'title' : news_title,
+                    'text' : news_body,
+                    'url' : url,
+                    'published_date' : published_date,
+                }
+
+                news_dump[str(index)] = result
+
+                return news_dump
+            else:
+                return
+            
 
 def main():
     news_link = sys.argv[1]
     news_source_name = sys.argv[2]
-    Scrapper(news_link=news_link, source=news_source_name).extractContent()
-
+    scrappy = Scrapper(news_link=news_link, source=news_source_name)
+    scrappy.extractContent()
+    scrappy.saveJson()
 
 if __name__ == '__main__':
     main()
