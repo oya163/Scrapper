@@ -1,43 +1,43 @@
 # Scrapper
 
-Developed as a part of #Icodeformyभाषा project of Nepali NLP Group
+Developed as part of my independent research in Nepali language. Kudos to [Nepali-NLP-Group](https://github.com/Nepali-NLP-Group).
 
 ## Dependencies
-
-	Beautiful Soup , re, urllib
-
-    Install pip
-    $ sudo apt-get install python-pip
-
-
-    Installing dependencies
-
-    $ pip install beautifulsoup4
-    $ pip install urllib
-
-    or
 
     $ pip install -r requirements.txt
 
 
-### E-Kantipur
+### How to run
 
-	Script to scrap Nepali news from various categories of following newspaper
+	$ python scrapper.py -n <news_link> \
+			     -s <news_source> \
+			     -st <start_date> \
+			     -et <end_date>
+			     
+	$ python scrapper.py -n https://ekantipur.com/ \
+			     -s kantipur \
+			     -st 2020/04/10 \
+			     -et 2020/04/15			     
+			     
+### Note:
+ - Currently, works only for Kantipur
+ - Start date and end date should be format YYYY/MM/DD
+ - Start date should be earlier one compared to end date
+ 
 
-    1. कान्तिपुर
-    2. नारी
-    3. साप्ताहिक
-    4. नेपाल
+### Output folder structure
+	source
+		category_1
+			date_1.json
+			date_2.json
+			.
+		category_2
+			date_1.json
+			date_2.json
+			.
+### To do:
 
-
-### Running Script
-
-You can run it in your terminal using the following command:
-
-$ python Scrapper.py http://kantipur.ekantipur.com कान्तिपुर
-
-Note that if you also have Python 2.x installed on your machine, you may need to
-explicitly call Python 3.x by running the command this way:
-
-$ python3 Scrapper.py http://kantipur.ekantipur.com कान्तिपुर
+- [ ] Add logger
+- [ ] Add timer
+- [ ] Add flexibility to download other news sites
 
