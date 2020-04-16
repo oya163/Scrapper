@@ -1,5 +1,32 @@
 # -*- coding: utf-8 -*-
 
+'''
+    How to run:
+        python scrapper.py \
+            -n https://ekantipur.com \
+            -s kantipur \
+            -d 2020/04/15
+
+    Note:
+        1. If date not given, takes latest date
+        2. Output folder structure:
+            source
+                category_1
+                    date.json
+                    date.json
+                    .
+                    .
+                category_2
+                    date.json
+                    date.json
+                    .
+                    .    
+                    
+    To do:
+        Add logger
+        Add timer
+'''
+
 import re
 import json
 import sys
@@ -9,6 +36,9 @@ import argparse
 import urllib.request
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse
+
+import datetime
+from datetime import date, timedelta
 
 
 class ReadOnlyClass(type):
@@ -45,7 +75,7 @@ class Scrapper:
         
         # Only write when file not present
         if not os.path.exists(fname):
-            print("Saving file : ", fname)
+            print("Dumping into file : {}".format(fname))
             with open(fname, 'w', encoding='utf-8') as f:
                 json.dump(self.dump, f, ensure_ascii=False, indent=4)
             
@@ -181,7 +211,6 @@ class Scrapper:
             
             if len(news_dump) > 0:
                 self.dump['category'] = news_dump
-                print("Saving JSON file !!!")
                 self.saveJson(directory=category, input_file=key_date)                 
                 
 
@@ -190,20 +219,35 @@ def main():
     parser.add_argument("-n", "--news_link", 
                         default="https://ekantipur.com/", 
                         metavar="LINK", help="News Link")
-    parser.add_argument("-s", "--news_source_name", 
+    parser.add_argument("-s", "--source", 
                         default="kantipur", 
                         metavar="SOURCE", help="News source name")
-    parser.add_argument("-d", "--date", default="",
+    parser.add_argument("-st", "--start_date", default="",
                         metavar="DATE", help="Date")
+    parser.add_argument("-et", "--end_date", default="",
+                        metavar="DATE", help="Date")    
     
     args = parser.parse_args()
     
     news_link = args.news_link
-    news_source_name = args.news_source_name
-    date = args.date
+    news_source_name = args.source
+    start_date = args.start_date
+    end_date = args.end_date
     
-    scrappy = Scrapper(news_link=news_link, source=news_source_name, given_date=date)
-    scrappy.extractContent()
+    syear, smonth, sday = map(int, start_date.split('/'))
+    sdate = datetime.date(syear, smonth, sday)
+    
+    eyear, emonth, eday = map(int, end_date.split('/'))
+    edate = datetime.date(eyear, emonth, eday)
+    
+    delta = edate - sdate       # as timedelta
+
+    for i in range(delta.days + 1):
+        day = sdate + timedelta(days=i)
+        given_date = day.strftime("%Y/%m/%d")
+        print("Getting all the articles for :", given_date)
+        scrappy = Scrapper(news_link=news_link, source=news_source_name, given_date=given_date)
+        scrappy.extractContent()
 
 if __name__ == '__main__':
     main()
