@@ -23,6 +23,5 @@ This is the script to scrap all the text from [Kantipur](https://ekantipur.com/)
 			.
 ### To do:
 
-[ ] Add logger
-
-[ ] Add timer
+- [ ] Add logger
+- [ ] Add timer
