@@ -5,22 +5,11 @@
         python scrapper.py \
             -n https://ekantipur.com \
             -s kantipur \
-            -d 2020/04/15
-
+            -st 2020/04/10 \
+            -et 2020/04/15
+            
     Note:
-        1. If date not given, takes latest date
-        2. Output folder structure:
-            source
-                category_1
-                    date.json
-                    date.json
-                    .
-                    .
-                category_2
-                    date.json
-                    date.json
-                    .
-                    .    
+        1. start_date should be less than end_date
                     
     To do:
         Add logger
