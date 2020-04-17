@@ -125,21 +125,18 @@ class Scrapper:
             # Exclude the first item
             for elm in footer.select(".col")[1:]:
                 topic = elm.find('h2').get_text()
-                print(topic)
                 items = elm.find_all('a', href=True)
                 for each in items:
                     half_link = each.get('href')
-                    subtopic = each.get_text()
+                    subtopic_eng = half_link.split("/")[-1] if half_link.split("/")[-1] else half_link.split("/")[-2]
+                    subtopic_nep = each.get_text()
+                    subtopic = (subtopic_eng, subtopic_nep)
 
-                    categories[half_link] = (self.cat_map[topic], subtopic)
+                    categories[half_link] = (topic, subtopic)
 
         print("All the available categories")
         for k,v in categories.items():
             print(k, v)
-
-        # Get all subcategories
-        
-        sys.exit(00)
             
         self.extractNewHeadline(categories) 
 
@@ -149,8 +146,9 @@ class Scrapper:
         # Create list of links of each page
         # Pass it to newsContents function
         # Dump it to file category wise        
-        articleIdDict = {}
+        
         for link, (topic, subtopic) in categoryDict.items():
+            articleIdDict = {}
             url = ''.join((self.NEWS_LINK, link))
             print(url, topic)
             
@@ -158,7 +156,8 @@ class Scrapper:
             
             for data in soup.find_all('a', href=True):
                 link = str(data.get('href'))
-                if link and 'trend' not in link and 'content' not in link and 'www.onlinekhabar.com' in link:
+                if link and 'trend' not in link and 'content' not in link \
+                        and 'www.onlinekhabar.com' in link and '2020' in link:
                     article_id = link.split("/")[-1]
                     if article_id not in articleIdDict:
                         articleIdDict[article_id] = ((topic,subtopic,link))
@@ -167,11 +166,11 @@ class Scrapper:
                         print("Reporting duplicate ID ", article_id)
 #                         print("Reporting duplicate LINK ", link)
                         
-#             print("All the available categories")
-#             for k,v in articleIdDict.items():
-#                 print(k, v)
+            print("All the available categories")
+            for k,v in articleIdDict.items():
+                print(k, v)
                 
-        self.newsNewContents(articleIdDict)
+            self.newsNewContents(articleIdDict)
 
     # retrieve the body for each headline
     def newsNewContents(self, articleIdDict):
@@ -186,12 +185,16 @@ class Scrapper:
                 date_dump[current_date].append(value)
             else:
                 date_dump[current_date] = [value]
+                
+#         print("All the available categories")
+#         for k,v in date_dump.items():
+#             print(k, v)          
+           
         
         # Get the date wise dumps
         news_dump = {}
         for (key_date, list_value) in date_dump.items():
-            for index, (article_id, category, subtopic, each_link) in enumerate(list_value):
-                category = topic
+            for index, (article_id, category, (subtopic_eng, subtopic_nep), link) in enumerate(list_value):
                 print ("*************** Category : {}, Index: {} ********************".format(category, (index + 1)))
                 url = link
                 article_id = link.split('/')[-1]
@@ -211,10 +214,11 @@ class Scrapper:
                 nep_date = soup.find('div',{'class': ['post__time']}).text  
                 nep_date = ' '.join(nep_date.split()[:-2])
 
-                try:
-                    author = soup.find('div',{'class': ['author__wrap']}).text.replace('\n','')  
-                except:
-                    author = 'onlinekhabar'
+                author = soup.find('div',{'class': ['author__wrap']}).text.replace('\n','')  
+#                 try:
+                    
+#                 except:
+#                     author = 'onlinekhabar'
 
                 # Get only the content from 
                 # normal article of main page of each link
@@ -236,13 +240,15 @@ class Scrapper:
 
                     # Get date
                     nep_date, eng_date = self.getDate(nep_date)
-
+                    
                     cat_eng = self.cat_map[category]
 
                     result = {
                         'article_id' : article_id,
                         'cat_nep' : category,
                         'cat_eng' : cat_eng,
+                        'subcat_eng' : subtopic_eng,
+                        'subcat_nep' : subtopic_nep,
                         'eng_date' : eng_date,
                         'nep_date' : nep_date,
                         'author': author,
@@ -257,141 +263,143 @@ class Scrapper:
 
             self.dump['category'] = news_dump
             print("Length of news dump in this category = ", len(news_dump))
-            self.saveJson(directory=cat_eng, input_file=key_date)              
-
-    # retrieve headline for each category
-    def extractHeadline(self, categoryList):
-        # Make a global dict of all article_id
-        # So it does not repeat accessing the articles again
-        for ind, (link, category) in enumerate(categoryList.items()):
-            articleIdSet = set()
-            # I just gave randomly 40
-            # to download 40 pages of every category
-            for i in range(1,30):
-                url = link
-
-                # Get category name in English
-                category_eng = url.split("/")[-1]
-
-                url += 'page/'+str(i)
-                try:
-                    soup = self.getSoup(url)
-                except:
-                    print("Unknown url")
-
-                headlineList = []
-                try:
-                    for data in soup.find_all('a', href=True):
-                        link = str(data.get('href'))
-                        # Removing trending link as well
-                        # Remove those last links having page 2/ or 3/ or 7625/
-                        # Remove those links outside of onlinekhabar
-                        if link is not None and 'trend' not in link and 'www.onlinekhabar.com' in link:
-                            # online khabar valid website has last
-                            # character as integer on every link
-                            try:
-                                int(link[-1])
-                                # Create article_id dictionary
-                                # to stop repeating the articles
-                                article_id = link.split("/")[-1]
-                                if article_id not in articleIdSet:
-                                    articleIdSet.add(article_id)
-                                    headlineList.append((category, link))
-                                    print("LINK = ", link)
-                                else:
-                                    print("Duplicate = ", link)
-                            except:
-                                print("Not convertible")
-                except:
-                    print("Unknown link")
-
-                self.newsContents(headlineList)
-
-
-    # retrieve the body for each headline
-    def newsContents(self, articleIdDict):
-        # Get the date wise dumps
-        date_dump = {}
-        for cat, each_link in headlineList:
-            curr_link = each_link.split('/')
-            current_date = curr_link[-2]+curr_link[-3]
+            self.saveJson(directory=os.path.join(cat_eng, subtopic_eng), input_file=key_date)
             
-            value = (cat, each_link)
-            if current_date in date_dump:
-                date_dump[current_date].append(value)
-            else:
-                date_dump[current_date] = [value]
+        sys.exit(00)
 
-        # Get the date wise dumps
-        news_dump = {}
-        for (key_date, list_value) in date_dump.items():
-            for index, (category, link) in enumerate(list_value):
-                print ("*************** Category : {}, Index: {} ********************".format(category, (index + 1)))
-                url = link
-                article_id = link.split('/')[-1]
-                print("Link :", url)
+#     # retrieve headline for each category
+#     def extractHeadline(self, categoryList):
+#         # Make a global dict of all article_id
+#         # So it does not repeat accessing the articles again
+#         for ind, (link, category) in enumerate(categoryList.items()):
+#             articleIdSet = set()
+#             # I just gave randomly 40
+#             # to download 40 pages of every category
+#             for i in range(1,30):
+#                 url = link
 
-                soup = self.getSoup(url)
+#                 # Get category name in English
+#                 category_eng = url.split("/")[-1]
 
-                title_source = soup.findAll('main', {'class': 'site-main'})
-                news_title = ''
-                for title in title_source:
-                    if title.find('h2') is not None:
-                        news_title = title.find('h2').text
-                        break
+#                 url += 'page/'+str(i)
+#                 try:
+#                     soup = self.getSoup(url)
+#                 except:
+#                     print("Unknown url")
 
-                print("Title : ", news_title)
+#                 headlineList = []
+#                 try:
+#                     for data in soup.find_all('a', href=True):
+#                         link = str(data.get('href'))
+#                         # Removing trending link as well
+#                         # Remove those last links having page 2/ or 3/ or 7625/
+#                         # Remove those links outside of onlinekhabar
+#                         if link is not None and 'trend' not in link and 'www.onlinekhabar.com' in link:
+#                             # online khabar valid website has last
+#                             # character as integer on every link
+#                             try:
+#                                 int(link[-1])
+#                                 # Create article_id dictionary
+#                                 # to stop repeating the articles
+#                                 article_id = link.split("/")[-1]
+#                                 if article_id not in articleIdSet:
+#                                     articleIdSet.add(article_id)
+#                                     headlineList.append((category, link))
+#                                     print("LINK = ", link)
+#                                 else:
+#                                     print("Duplicate = ", link)
+#                             except:
+#                                 print("Not convertible")
+#                 except:
+#                     print("Unknown link")
 
-                nep_date = soup.find('div',{'class': ['post__time']}).text  
-                nep_date = ' '.join(nep_date.split()[:-2])
+#                 self.newsContents(headlineList)
 
-                try:
-                    author = soup.find('div',{'class': ['author__wrap']}).text.replace('\n','')  
-                except:
-                    author = 'onlinekhabar'
 
-                # Get only the content from 
-                # normal article of main page of each link
-                body_content = soup.find('div', {'class': ['col colspan3 main__read--content ok18-single-post-content-wrap']})
+#     # retrieve the body for each headline
+#     def newsContents(self, articleIdDict):
+#         # Get the date wise dumps
+#         date_dump = {}
+#         for cat, each_link in headlineList:
+#             curr_link = each_link.split('/')
+#             current_date = curr_link[-2]+curr_link[-3]
+            
+#             value = (cat, each_link)
+#             if current_date in date_dump:
+#                 date_dump[current_date].append(value)
+#             else:
+#                 date_dump[current_date] = [value]
 
-                news_body=' '
+#         # Get the date wise dumps
+#         news_dump = {}
+#         for (key_date, list_value) in date_dump.items():
+#             for index, (category, link) in enumerate(list_value):
+#                 print ("*************** Category : {}, Index: {} ********************".format(category, (index + 1)))
+#                 url = link
+#                 article_id = link.split('/')[-1]
+#                 print("Link :", url)
 
-                # Some of the category has no content 
-                # like photo_feature or video
-                if body_content:
-                    for body in body_content.findAll('p'):
-                        # check if it the body is empty
-                        # exclude the javascript inside <p></p> tag
-                        # exclude the duplicates from appending
-                        if str(body.text.encode('ascii', 'ignore'))!="" \
-                                        and 'script' not in str(body) \
-                                        and body.text not in news_body:
-                            news_body += body.text 
+#                 soup = self.getSoup(url)
 
-                    # Get date
-                    nep_date, eng_date = self.getDate(nep_date)
+#                 title_source = soup.findAll('main', {'class': 'site-main'})
+#                 news_title = ''
+#                 for title in title_source:
+#                     if title.find('h2') is not None:
+#                         news_title = title.find('h2').text
+#                         break
 
-                    cat_eng = self.cat_map[category]
+#                 print("Title : ", news_title)
 
-                    result = {
-                        'article_id' : article_id,
-                        'cat_nep' : category,
-                        'cat_eng' : cat_eng,
-                        'eng_date' : eng_date,
-                        'nep_date' : nep_date,
-                        'author': author,
-                        'title' : news_title,
-                        'text' : news_body,
-                        'url' : url
-                    }
-                    news_dump[article_id] = result
+#                 nep_date = soup.find('div',{'class': ['post__time']}).text  
+#                 nep_date = ' '.join(nep_date.split()[:-2])
 
-#             for k,v in news_dump.items():
-#                 print(k, v['url'], v['title'])                
+#                 try:
+#                     author = soup.find('div',{'class': ['author__wrap']}).text.replace('\n','')  
+#                 except:
+#                     author = 'onlinekhabar'
 
-            self.dump['category'] = news_dump
-            print("Length of news dump in this category = ", len(news_dump))
-            self.saveJson(directory=cat_eng, input_file=key_date)               
+#                 # Get only the content from 
+#                 # normal article of main page of each link
+#                 body_content = soup.find('div', {'class': ['col colspan3 main__read--content ok18-single-post-content-wrap']})
+
+#                 news_body=' '
+
+#                 # Some of the category has no content 
+#                 # like photo_feature or video
+#                 if body_content:
+#                     for body in body_content.findAll('p'):
+#                         # check if it the body is empty
+#                         # exclude the javascript inside <p></p> tag
+#                         # exclude the duplicates from appending
+#                         if str(body.text.encode('ascii', 'ignore'))!="" \
+#                                         and 'script' not in str(body) \
+#                                         and body.text not in news_body:
+#                             news_body += body.text 
+
+#                     # Get date
+#                     nep_date, eng_date = self.getDate(nep_date)
+
+#                     cat_eng = self.cat_map[category]
+
+#                     result = {
+#                         'article_id' : article_id,
+#                         'cat_nep' : category,
+#                         'cat_eng' : cat_eng,
+#                         'eng_date' : eng_date,
+#                         'nep_date' : nep_date,
+#                         'author': author,
+#                         'title' : news_title,
+#                         'text' : news_body,
+#                         'url' : url
+#                     }
+#                     news_dump[article_id] = result
+
+# #             for k,v in news_dump.items():
+# #                 print(k, v['url'], v['title'])                
+
+#             self.dump['category'] = news_dump
+#             print("Length of news dump in this category = ", len(news_dump))
+#             self.saveJson(directory=cat_eng, input_file=key_date)               
                 
 
 def main():
