@@ -1,2 +1,3 @@
 beautifulsoup4==4.3.2
 urllib==1.21.1
+nepali-date==2.0.2

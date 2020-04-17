@@ -27,8 +27,8 @@ from bs4 import BeautifulSoup
 from urllib.parse import urlparse
 
 import datetime
-from datetime import date, timedelta
-
+from datetime import date, timedelta, time
+from nepali_date import NepaliDate
 
 class ReadOnlyClass(type):
     def __setattr__(self, name, value):
@@ -52,6 +52,39 @@ class Scrapper:
         
         if not os.path.exists(self.SOURCE):
             os.mkdir(self.SOURCE)
+            
+        self.month_mapping = {'बैशाख':'1', 'वैशाख': '1', 
+                              'जेष्ठ':'2','जेठ':'2',
+                              'आषाढ':'3','असार':'3',
+                              'श्रावण':'4','साउन':'4', 
+                              'भाद्र':'5', 'भदौ':'5',
+                              'आश्विन':'6', 'असोज':'6',
+                              'कार्तिक':'7',
+                              'मार्ग':'8', 'मंसिर:':'8',
+                              'पौष':'9', 'पुष' :'9', 'पूस':'9',
+                              'माघ':'10', 
+                              'फाल्गुन':'11', 'फागुन':'11',
+                              'चैत्र':'12', 'चैत':'12'}
+        
+        self.cat_map = {'समाचार':'news', 'विजनेश': 'business', 'जीवनशैली':'lifestyle','सूचना प्रविधि':'technology',
+                       'मनोरन्जन':'entertainment', 'प्रवास': 'prabhas-news', 'खेलकुद':'sports'}
+        
+        
+    def getDate(self, input_nep_date):
+        nep_date = input_nep_date.split()
+        yy = nep_date[0]
+        mm = nep_date[1]
+        dd = nep_date[2]
+        nep_date = yy+'/'+self.month_mapping[mm]+'/'+dd
+        nep_date = NepaliDate.strpdate(nep_date, '%Y/%m/%d')
+        eng_date = nep_date.to_english_date().strftime('%m/%d/%Y')
+        nep_date = nep_date.strfdate('%Y/%m/%d')
+        return (nep_date, eng_date)
+        
+        
+    def getEnglishCategory(self, text):
+        return text
+        
         
     def saveJson(self, directory=None, input_file=None):
         save_path = os.path.join(self.SOURCE, directory)
@@ -61,12 +94,10 @@ class Scrapper:
             
         filename = input_file + '.json'
         fname = os.path.join(save_path, filename)
-        
-        # Only write when file not present
-        if not os.path.exists(fname):
-            print("Dumping into file : {}".format(fname))
-            with open(fname, 'w', encoding='utf-8') as f:
-                json.dump(self.dump, f, ensure_ascii=False, indent=4)
+
+        print("Dumping into file : {}".format(fname))
+        with open(fname, 'w', encoding='utf-8') as f:
+            json.dump(self.dump, f, ensure_ascii=False, indent=4)
             
     def getSoup(self, url=None):
         headers = {}
@@ -108,156 +139,144 @@ class Scrapper:
 
     # retrieve headline for each category
     def extractHeadline(self, categoryList):
-
+        print(categoryList)
         for ind, (link, category) in enumerate(categoryList.items()):
             url = link
             
             # Get category name in English
             category_eng = url.split("/")[-1]
             
-#             url += '/'+self.given_date
             url += '/page/1'
             soup = self.getSoup(url)
             
             headlineList = []
             for data in soup.find_all('a', href=True):
                 link = str(data.get('href'))
-                if link is not None:
+                # Removing trending link as well
+                # Remove those last links having page 2/ or 3/ or 7625/
+                if link is not None and 'trend' not in link and '2020' in link:
+                    # online khabar valid website has last
+                    # character as integer on every link
                     try:
                         int(link[-1])
                         headlineList.append((category, link))
                         print(link)
                     except:
                         print("Not convertible")
+
             self.newsContents(headlineList)
 
 
     # retrieve the body for each headline
     def newsContents(self, headlineList):
-        
         # Get the date wise dumps
-#         date_dump = {}
-#         for cat, each_link in headlineList:
-#             curr_link = each_link.split('/')
-#             current_date = curr_link[3]+curr_link[4]+curr_link[2] 
+        date_dump = {}
+        for cat, each_link in headlineList:
+            curr_link = each_link.split('/')
+            current_date = curr_link[-2]+curr_link[-3]
             
-#             if current_date in date_dump:
-#                 date_dump[current_date].append(each_link)
-#             else:
-#                 date_dump[current_date] = [each_link]
-            
-        # Get content date-wise
-        # And store accordingly
-#         for (key_date, list_value) in date_dump.items():
+            value = (cat, each_link)
+            if current_date in date_dump:
+                date_dump[current_date].append(value)
+            else:
+                date_dump[current_date] = [value]
+
+        # Get the date wise dumps
         news_dump = {}
-        for index, (category, link) in enumerate(headlineList):
-            print ("*************** Category : {}, #: {} ********************".format(category, (index + 1)))
-            url = link
-            # [1:] because of extra / in half_link
-#             url = url.join((self.NEWS_LINK, half_link[1:]))
-            print("Link :", url)
+        for (key_date, list_value) in date_dump.items():
+            for index, (category, link) in enumerate(list_value):
+                print ("*************** Category : {}, Index: {} ********************".format(category, (index + 1)))
+                url = link
+                article_id = link.split('/')[-1]
+                print("Link :", url)
 
-#             r = urllib.request.urlopen(url).read()
-#             soup = BeautifulSoup(r, 'html.parser')
-            
-            soup = self.getSoup(url)
+                soup = self.getSoup(url)
 
-            title_source = soup.findAll('main', {'class': 'site-main'})
-            news_title = ''
-            for title in title_source:
-                if title.find('h2') is not None:
-                    news_title = title.find('h2').text
-                    break
-            
-            print(news_title)
-            
-            nep_date = soup.find('div',{'class': ['post__time']}).text  
-            nep_date = ' '.join(nep_date.split()[:-2])
-            print(nep_date)
-            
-            try:
-                author = soup.find('div',{'class': ['author__wrap']}).text  
-            except:
-                author = 'onlinekhabar'
-            
-            # Get only the content from 
-            # normal article of main page of each link
-            body_content = soup.find('div', {'class': ['col colspan3 main__read--content ok18-single-post-content-wrap']})
+                title_source = soup.findAll('main', {'class': 'site-main'})
+                news_title = ''
+                for title in title_source:
+                    if title.find('h2') is not None:
+                        news_title = title.find('h2').text
+                        break
 
-            news_body=' '
+                print("Title : ", news_title)
 
-            # Some of the category has no content 
-            # like photo_feature or video
-            if body_content:
-                for body in body_content.findAll('p'):
-                    # check if it the body is empty
-                    # exclude the javascript inside <p></p> tag
-                    # exclude the duplicates from appending
-                    if str(body.text.encode('ascii', 'ignore'))!="" \
-                                    and 'script' not in str(body) \
-                                    and body.text not in news_body:
-                        news_body += body.text 
-                
-                # Get date
-                split_url = url.split('/')
-                print(split_url)
-                cat_eng = split_url[-5]
-                yy = split_url[-4]
-                mm = split_url[-3]
-                dd = split_url[-2]
-                self.published_date = mm+dd+yy
+                nep_date = soup.find('div',{'class': ['post__time']}).text  
+                nep_date = ' '.join(nep_date.split()[:-2])
 
-                result = {
-                    'cat_nep' : category,
-                    'eng_date' : self.published_date,
-                    'nep_date' : nep_date,
-                    'author': author,
-                    'title' : news_title,
-                    'text' : news_body,
-                    'url' : url
-                }
+                try:
+                    author = soup.find('div',{'class': ['author__wrap']}).text.replace('\n','')  
+                except:
+                    author = 'onlinekhabar'
 
-                news_dump[str(index)] = result
+                # Get only the content from 
+                # normal article of main page of each link
+                body_content = soup.find('div', {'class': ['col colspan3 main__read--content ok18-single-post-content-wrap']})
 
-        if len(news_dump) > 0:
+                news_body=' '
+
+                # Some of the category has no content 
+                # like photo_feature or video
+                if body_content:
+                    for body in body_content.findAll('p'):
+                        # check if it the body is empty
+                        # exclude the javascript inside <p></p> tag
+                        # exclude the duplicates from appending
+                        if str(body.text.encode('ascii', 'ignore'))!="" \
+                                        and 'script' not in str(body) \
+                                        and body.text not in news_body:
+                            news_body += body.text 
+
+                    # Get date
+                    nep_date, eng_date = self.getDate(nep_date)
+
+                    cat_eng = self.cat_map[category]
+
+                    result = {
+                        'article_id' : article_id,
+                        'cat_nep' : category,
+                        'cat_eng' : cat_eng,
+                        'eng_date' : eng_date,
+                        'nep_date' : nep_date,
+                        'author': author,
+                        'title' : news_title,
+                        'text' : news_body,
+                        'url' : url
+                    }
+                    news_dump[article_id] = result
+
+#             for k,v in news_dump.items():
+#                 print(k, v['url'], v['title'])                
+
             self.dump['category'] = news_dump
-            self.saveJson(directory=category, input_file=key_date)                 
+            print("Lenght of news dump in this category = ", len(news_dump))
+            self.saveJson(directory=cat_eng, input_file=key_date)               
                 
 
 def main():
-    parser = argparse.ArgumentParser("Kantipur Scrapper")
+    parser = argparse.ArgumentParser("Online Khabar Scrapper")
     parser.add_argument("-n", "--news_link", 
-                        default="https://ekantipur.com/", 
+                        default="https://www.onlinekhabar.com/business", 
                         metavar="LINK", help="News Link")
     parser.add_argument("-s", "--source", 
-                        default="kantipur", 
+                        default="onlinekhabar", 
                         metavar="SOURCE", help="News source name")
-    parser.add_argument("-st", "--start_date", default="",
+    parser.add_argument("-d", "--given_date", default="2020/04",
                         metavar="DATE", help="Date")
-    parser.add_argument("-et", "--end_date", default="",
+    parser.add_argument("-et", "--end_date", default="2020/04/17",
                         metavar="DATE", help="Date")    
     
     args = parser.parse_args()
     
     news_link = args.news_link
     news_source_name = args.source
-    start_date = args.start_date
-    end_date = args.end_date
     
-    syear, smonth, sday = map(int, start_date.split('/'))
-    sdate = datetime.date(syear, smonth, sday)
+    # Fix current date if not given
+    given_date = args.given_date
     
-    eyear, emonth, eday = map(int, end_date.split('/'))
-    edate = datetime.date(eyear, emonth, eday)
-    
-    delta = edate - sdate       # as timedelta
-
-    for i in range(delta.days + 1):
-        day = sdate + timedelta(days=i)
-        given_date = day.strftime("%Y/%m/%d")
-        print("Getting all the articles for :", given_date)
-        scrappy = Scrapper(news_link=news_link, source=news_source_name, given_date=given_date)
-        scrappy.extractContent()
+    print("Getting all the articles for :", given_date)
+    scrappy = Scrapper(news_link=news_link, source=news_source_name, given_date=given_date)
+    scrappy.extractContent()
 
 if __name__ == '__main__':
     main()
