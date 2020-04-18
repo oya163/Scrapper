@@ -170,7 +170,7 @@ class Scrapper:
                     logger.info("Getting all contents from {}".format(url))
                     
                     soup = self.getSoup(url)
-
+                    
                     for data in soup.find_all('a', href=True):
                         link = str(data.get('href'))
                         if link and 'trend' not in link and 'content' not in link \
@@ -178,9 +178,10 @@ class Scrapper:
                                 and '2020' in link:
                             article_id = link.split("/")[-1]
                             if article_id not in articleIdDict:
-                                articleIdDict[article_id] = ((topic,subtopic,link))
+                                articleIdDict[(subtopic[0], article_id)] = ((topic,subtopic,link))
                                 logger.info("{} {} {}".format(topic,subtopic,link))
-
+                            else:
+                                logger.info("Reporting duplicates : {}".format(link))
                         
 #         print("All the available items")
 #         for k,v in articleIdDict.items():
@@ -193,7 +194,7 @@ class Scrapper:
     def newsNewContents(self, articleIdDict):
         # Get the date wise dumps
         date_dump = {}
-        for article_id, (topic, subtopic, each_link) in articleIdDict.items():
+        for (_, article_id), (topic, subtopic, each_link) in articleIdDict.items():
             curr_link = each_link.split('/')
             current_date = curr_link[-2]+curr_link[-3]
             
@@ -297,7 +298,7 @@ def main():
                         metavar="SOURCE", help="News source name")
     parser.add_argument("-d", "--given_date", default=None,
                         metavar="DATE", help="Date Format : 2020/04")
-    parser.add_argument("-p", "--page_num", default=19, type=int,
+    parser.add_argument("-p", "--page_num", default=15, type=int,
                         metavar="PAGE", help="Number of pages to scrap")    
     
     args = parser.parse_args()
