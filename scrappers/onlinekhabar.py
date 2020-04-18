@@ -147,7 +147,7 @@ class Scrapper:
                     subtopic_eng = half_link.split("/")[-1] if half_link.split("/")[-1] else half_link.split("/")[-2]
                     subtopic_nep = each.get_text()
                     subtopic = (subtopic_eng, subtopic_nep)
-                    categories[half_link] = (topic, subtopic)
+                    categories[half_link] = (self.cat_map[topic], topic, subtopic)
 
 #         logger.info("All the available categories")
 #         for k,v in categories.items():
@@ -162,9 +162,10 @@ class Scrapper:
         articleIdDict = {}
         
         # Iterate through each category
-        for pg_num in range(1, self.page_num):
-            suffix = '/page/'+str(pg_num)
-            for link, (topic, subtopic) in categoryDict.items():    
+        for i in range(0, self.page_num):
+            page_num = i+1
+            suffix = '/page/'+str(page_num)
+            for link, (topic, cat_nep, subtopic) in categoryDict.items():    
                 url = ''.join((self.NEWS_LINK, link+suffix))
                 if 'contact-us' not in url:
                     logger.info("Getting all contents from {}".format(url))
@@ -178,10 +179,10 @@ class Scrapper:
                                 and '2020' in link:
                             article_id = link.split("/")[-1]
                             if article_id not in articleIdDict:
-                                articleIdDict[(pg_num, article_id)] = ((topic,subtopic,link))
-                                logger.info("{} {} {}".format(topic,subtopic,link))
-                            else:
-                                logger.info("Reporting duplicates : {}".format(link))
+                                articleIdDict[article_id] = ((page_num, topic, cat_nep, subtopic, link))
+                                logger.info("Page Num:{} Topic:{} SubTopic:{} Link:{}".format(page_num, topic, subtopic, link))
+#                             else:
+#                                 logger.info("Reporting duplicates : {}".format(link))
                         
 #         print("All the available items")
 #         for k,v in articleIdDict.items():
@@ -194,26 +195,39 @@ class Scrapper:
     def newsNewContents(self, articleIdDict):
         # Get the date wise dumps
         date_dump = {}
-        for article_id, (topic, subtopic, each_link) in articleIdDict.items():
+        for (article_id), (pg_num, topic, cat_nep, subtopic, each_link) in articleIdDict.items():
             curr_link = each_link.split('/')
             current_date = curr_link[-2]+curr_link[-3]
             
-            value = (article_id, topic, subtopic, each_link)
+            value = (pg_num, article_id, topic, cat_nep, subtopic, each_link)
             if current_date in date_dump:
                 date_dump[current_date].append(value)
             else:
-                date_dump[current_date)] = [value]
+                date_dump[current_date] = [value]
+        
+        # Sort right here !!!
+#         logger.info("All the available items")
+#         for key_date,list_value in sorted(date_dump.items()):
+#             list_value = sorted(list_value, key = lambda x: x[2])
+#             for each in list_value:
+#                 logger.info("{},{}".format(key_date, each))
+            
+#         sys.exit(00)
         
         # Iterate through each date
-        for ((pg_num, key_date), list_value) in date_dump.items():
+        for (key_date, list_value) in sorted(date_dump.items()):
+            # Sort by the topic
+            list_value = sorted(list_value, key = lambda x: x[2])
+            
+            # Dictionary of news_dump
             news_dump = {}
-            (article_id, category, (subtopic_eng, subtopic_nep), link) = list_value[0]
-            prev_cat = self.cat_map[category]
+            
+            # Prev category
+            prev_cat = list_value[0][2]
             
             # Iterate through each articles
-            for index, (article_id, category, (subtopic_eng, subtopic_nep), link) in enumerate(list_value):
-                logger.info ("*************** Category:{}, SubCategory:{}, Index: {} \
-                        ********************".format(category, subtopic_eng, (index + 1)))
+            for index, (pg_num, article_id, topic, cat_nep, (subtopic_eng, subtopic_nep), link) in enumerate(list_value):
+                logger.info ("***************Page Num:{} Category:{}, SubCategory:{}, Index: {} ********************".format(pg_num, topic, subtopic_eng, (index + 1)))
                 url = link
                 logger.info("Link : {}".format(url))
 
@@ -254,11 +268,11 @@ class Scrapper:
                 nep_date, eng_date = self.getDate(nep_date)
 
                 # Get category in English
-                cat_eng = self.cat_map[category]
+                cat_eng = topic
 
                 result = {
                     'article_id' : article_id,
-                    'cat_nep' : category,
+                    'cat_nep' : cat_nep,
                     'cat_eng' : cat_eng,
                     'subcat_eng' : subtopic_eng,
                     'subcat_nep' : subtopic_nep,
@@ -276,16 +290,16 @@ class Scrapper:
                 if prev_cat != cat_eng:
                     self.dump['category'] = news_dump
                     logger.info("Length of news dump in {} category : {}".format(prev_cat, len(news_dump)))
-                    self.saveJson(directory=prev_cat, input_file=key_date+'_'+str(pg_num))
+                    self.saveJson(directory=prev_cat, input_file=key_date)
                     news_dump={}
                     prev_cat = cat_eng
                     
                 news_dump[article_id] = result
                 
-            logger.info("Saving last category : ")            
+            # Saving last category            
             self.dump['category'] = news_dump
             logger.info("Length of news dump in {} category : {}".format(prev_cat, len(news_dump)))
-            self.saveJson(directory=prev_cat, input_file=key_date+'_'+str(pg_num))
+            self.saveJson(directory=prev_cat, input_file=key_date)
 
 
 def main():
@@ -298,7 +312,7 @@ def main():
                         metavar="SOURCE", help="News source name")
     parser.add_argument("-d", "--given_date", default=None,
                         metavar="DATE", help="Date Format : 2020/04")
-    parser.add_argument("-p", "--page_num", default=3, type=int,
+    parser.add_argument("-p", "--page_num", default=10, type=int,
                         metavar="PAGE", help="Number of pages to scrap")    
     
     args = parser.parse_args()
