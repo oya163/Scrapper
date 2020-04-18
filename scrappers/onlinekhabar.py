@@ -75,7 +75,7 @@ class Scrapper:
                               'भाद्र':'5', 'भदौ':'5',
                               'आश्विन':'6', 'असोज':'6',
                               'कार्तिक':'7',
-                              'मार्ग':'8', 'मंसिर:':'8',
+                              'मंसिर:':'8', 'मार्ग':'8',
                               'पौष':'9', 'पुष' :'9', 'पूस':'9',
                               'माघ':'10', 
                               'फाल्गुन':'11', 'फागुन':'11',
@@ -178,7 +178,7 @@ class Scrapper:
                                 and '2020' in link:
                             article_id = link.split("/")[-1]
                             if article_id not in articleIdDict:
-                                articleIdDict[(subtopic[0], article_id)] = ((topic,subtopic,link))
+                                articleIdDict[(pg_num, article_id)] = ((topic,subtopic,link))
                                 logger.info("{} {} {}".format(topic,subtopic,link))
                             else:
                                 logger.info("Reporting duplicates : {}".format(link))
@@ -194,7 +194,7 @@ class Scrapper:
     def newsNewContents(self, articleIdDict):
         # Get the date wise dumps
         date_dump = {}
-        for (_, article_id), (topic, subtopic, each_link) in articleIdDict.items():
+        for article_id, (topic, subtopic, each_link) in articleIdDict.items():
             curr_link = each_link.split('/')
             current_date = curr_link[-2]+curr_link[-3]
             
@@ -202,10 +202,10 @@ class Scrapper:
             if current_date in date_dump:
                 date_dump[current_date].append(value)
             else:
-                date_dump[current_date] = [value]
+                date_dump[current_date)] = [value]
         
         # Iterate through each date
-        for (key_date, list_value) in date_dump.items():
+        for ((pg_num, key_date), list_value) in date_dump.items():
             news_dump = {}
             (article_id, category, (subtopic_eng, subtopic_nep), link) = list_value[0]
             prev_cat = self.cat_map[category]
@@ -276,7 +276,7 @@ class Scrapper:
                 if prev_cat != cat_eng:
                     self.dump['category'] = news_dump
                     logger.info("Length of news dump in {} category : {}".format(prev_cat, len(news_dump)))
-                    self.saveJson(directory=prev_cat, input_file=key_date)
+                    self.saveJson(directory=prev_cat, input_file=key_date+'_'+str(pg_num))
                     news_dump={}
                     prev_cat = cat_eng
                     
@@ -285,7 +285,7 @@ class Scrapper:
             logger.info("Saving last category : ")            
             self.dump['category'] = news_dump
             logger.info("Length of news dump in {} category : {}".format(prev_cat, len(news_dump)))
-            self.saveJson(directory=prev_cat, input_file=key_date)
+            self.saveJson(directory=prev_cat, input_file=key_date+'_'+str(pg_num))
 
 
 def main():
@@ -298,7 +298,7 @@ def main():
                         metavar="SOURCE", help="News source name")
     parser.add_argument("-d", "--given_date", default=None,
                         metavar="DATE", help="Date Format : 2020/04")
-    parser.add_argument("-p", "--page_num", default=15, type=int,
+    parser.add_argument("-p", "--page_num", default=3, type=int,
                         metavar="PAGE", help="Number of pages to scrap")    
     
     args = parser.parse_args()
