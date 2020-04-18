@@ -75,7 +75,7 @@ class Scrapper:
                               'भाद्र':'5', 'भदौ':'5',
                               'आश्विन':'6', 'असोज':'6',
                               'कार्तिक':'7',
-                              'मंसिर:':'8', 'मार्ग':'8',
+                              'मंसिर':'8', 'मार्ग':'8',
                               'पौष':'9', 'पुष' :'9', 'पूस':'9',
                               'माघ':'10', 
                               'फाल्गुन':'11', 'फागुन':'11',
@@ -215,8 +215,9 @@ class Scrapper:
 #         sys.exit(00)
         
         # Iterate through each date
-        for (key_date, list_value) in sorted(date_dump.items()):
-            # Sort by the topic
+        # Process latest date first
+        for (key_date, list_value) in sorted(date_dump.items(), reverse=True):
+            # Sort by the main topic
             list_value = sorted(list_value, key = lambda x: x[2])
             
             # Dictionary of news_dump
@@ -312,7 +313,7 @@ def main():
                         metavar="SOURCE", help="News source name")
     parser.add_argument("-d", "--given_date", default=None,
                         metavar="DATE", help="Date Format : 2020/04")
-    parser.add_argument("-p", "--page_num", default=10, type=int,
+    parser.add_argument("-p", "--page_num", default=15, type=int,
                         metavar="PAGE", help="Number of pages to scrap")    
     
     args = parser.parse_args()
