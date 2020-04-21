@@ -2,9 +2,7 @@
 
 '''
     How to run:
-        python scrapper.py \
-            -n https://ekantipur.com \
-            -s kantipur \
+        python ekantipur.py
             -st 2020/04/10 \
             -et 2020/04/15
             
@@ -28,7 +26,27 @@ from urllib.parse import urlparse
 
 import datetime
 from datetime import date, timedelta
+import time
 
+import logging
+import logging.config
+
+logname = 'ekantipur'
+logger = logging.getLogger(logname)
+
+data_path="./logs"
+log_path = os.path.join(data_path, logname+".log")
+logging.basicConfig(filename=log_path,level=logging.INFO,filemode='w')
+
+formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s:%(message)s')
+
+sh = logging.StreamHandler(sys.stdout)
+sh.setFormatter(formatter)
+logger.addHandler(sh)
+
+fh = logging.FileHandler(log_path)
+fh.setFormatter(formatter)
+logger.addHandler(fh)
 
 class ReadOnlyClass(type):
     def __setattr__(self, name, value):
@@ -64,7 +82,7 @@ class Scrapper:
         
         # Only write when file not present
         if not os.path.exists(fname):
-            print("Dumping into file : {}".format(fname))
+            logger.info("Dumping into file : {}".format(fname))
             with open(fname, 'w', encoding='utf-8') as f:
                 json.dump(self.dump, f, ensure_ascii=False, indent=4)
             
@@ -138,12 +156,12 @@ class Scrapper:
             news_dump = {}
             for index, half_link in enumerate(list_value):
                 category = half_link.split('/')[1]
-                print ("*************** Category : {}, #: {} ********************".format(category, (index + 1)))
+                logger.info ("*************** Category : {}, #: {} ********************".format(category, (index + 1)))
                 url = ''
                 
                 # [1:] because of extra / in half_link
                 url = url.join((self.NEWS_LINK, half_link[1:]))
-                print("Link :", url)
+                logger.info("Link : {}".format(url))
 
                 r = urllib.request.urlopen(url).read()
                 soup = BeautifulSoup(r, 'html.parser')
@@ -230,13 +248,20 @@ def main():
     edate = datetime.date(eyear, emonth, eday)
     
     delta = edate - sdate       # as timedelta
-
+    
+    start_time = time.time()
+    
     for i in range(delta.days + 1):
         day = sdate + timedelta(days=i)
         given_date = day.strftime("%Y/%m/%d")
-        print("Getting all the articles for :", given_date)
+        logger.info("Getting all the articles for : {}".format(given_date))
         scrappy = Scrapper(news_link=news_link, source=news_source_name, given_date=given_date)
         scrappy.extractContent()
-
+        
+    seconds = time.time() - start_time
+    
+    logger.info("Total time taken to scrap : {}".format(time.strftime("%H:%M:%S",time.gmtime(seconds))))
+    
+    
 if __name__ == '__main__':
     main()
