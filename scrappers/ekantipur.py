@@ -9,9 +9,6 @@
     Note:
         1. start_date should be less than end_date
                     
-    To do:
-        Add logger
-        Add timer
 '''
 
 import re
