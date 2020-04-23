@@ -32,6 +32,9 @@ logname = 'ekantipur'
 logger = logging.getLogger(logname)
 
 data_path="./logs"
+if not os.path.exists(data_path):
+    os.mkdir(data_path)
+
 log_path = os.path.join(data_path, logname+".log")
 logging.basicConfig(filename=log_path,level=logging.INFO,filemode='w')
 
@@ -159,59 +162,63 @@ class Scrapper:
                 # [1:] because of extra / in half_link
                 url = url.join((self.NEWS_LINK, half_link[1:]))
                 logger.info("Link : {}".format(url))
+                
+                try:
+                    r = urllib.request.urlopen(url).read()
 
-                r = urllib.request.urlopen(url).read()
-                soup = BeautifulSoup(r, 'html.parser')
+                    soup = BeautifulSoup(r, 'html.parser')
 
-                title_source = soup.find_all('div', {'class': ['article-header']})
-                if title_source[0].find({'h1', 'h2'}) is not None:
-                    news_title = title_source[0].find({'h1', 'h2'}).text
+                    title_source = soup.find_all('div', {'class': ['article-header']})
+                    if title_source[0].find({'h1', 'h2'}) is not None:
+                        news_title = title_source[0].find({'h1', 'h2'}).text
 
-                author = soup.find('span',{'class': ['author']}).text
-                nep_date = soup.find('time',{'style': ['display:inline-block']}).text           
+                    author = soup.find('span',{'class': ['author']}).text
+                    nep_date = soup.find('time',{'style': ['display:inline-block']}).text           
 
-                # Get only the content from 
-                # normal article of main page of each link
-                body_content = soup.find('article', {'class': ['normal']})
+                    # Get only the content from 
+                    # normal article of main page of each link
+                    body_content = soup.find('article', {'class': ['normal']})
 
-                news_body=' '
+                    news_body=' '
 
-                # Some of the category has no content 
-                # like photo_feature or video
-                if body_content:
-                    for body in body_content.findAll('p'):
-                        # check if it the body is empty
-                        # exclude the javascript inside <p></p> tag
-                        # exclude the duplicates from appending
-                        if str(body.text.encode('ascii', 'ignore'))!="" \
-                                        and 'script' not in str(body) \
-                                        and body.text not in news_body:
-                            news_body += body.text
+                    # Some of the category has no content 
+                    # like photo_feature or video
+                    if body_content:
+                        for body in body_content.findAll('p'):
+                            # check if it the body is empty
+                            # exclude the javascript inside <p></p> tag
+                            # exclude the duplicates from appending
+                            if str(body.text.encode('ascii', 'ignore'))!="" \
+                                            and 'script' not in str(body) \
+                                            and body.text not in news_body:
+                                news_body += body.text
 
-                    # To remove unnecessary end of the sentence
-                    # For example - प्रकाशित : वैशाख ३, २०७७ ०८:२७
-                    news_body = ' '.join(news_body.split()[:-6])
+                        # To remove unnecessary end of the sentence
+                        # For example - प्रकाशित : वैशाख ३, २०७७ ०८:२७
+                        news_body = ' '.join(news_body.split()[:-6])
 
-                    # Get date
-                    split_url = url.split('/')
-                    cat_eng = split_url[-5]
-                    yy = split_url[-4]
-                    mm = split_url[-3]
-                    dd = split_url[-2]
-                    self.published_date = mm+dd+yy
+                        # Get date
+                        split_url = url.split('/')
+                        cat_eng = split_url[-5]
+                        yy = split_url[-4]
+                        mm = split_url[-3]
+                        dd = split_url[-2]
+                        self.published_date = mm+dd+yy
 
-                    result = {
-                        'cat_eng' : cat_eng,
-                        'cat_nep' : category,
-                        'eng_date' : self.published_date,
-                        'nep_date' : nep_date,
-                        'author': author,
-                        'title' : news_title,
-                        'text' : news_body,
-                        'url' : url
-                    }
+                        result = {
+                            'cat_eng' : cat_eng,
+                            'cat_nep' : category,
+                            'eng_date' : self.published_date,
+                            'nep_date' : nep_date,
+                            'author': author,
+                            'title' : news_title,
+                            'text' : news_body,
+                            'url' : url
+                        }
 
-                    news_dump[str(index)] = result
+                        news_dump[str(index)] = result
+                except:
+                    logger.info("404 Error!!! Cannot save content from {}".format(url))                        
             
             if len(news_dump) > 0:
                 self.dump['category'] = news_dump
