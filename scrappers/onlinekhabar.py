@@ -2,10 +2,7 @@
 
 '''
     How to run:
-        python scrapper.py \
-            -n https://ekantipur.com \
-            -s kantipur \
-            -p 15
+        python onlinekhabar.py -sp 16 -ep 50
 '''
 
 import re
@@ -30,6 +27,8 @@ logname = 'onlinekhabar'
 logger = logging.getLogger(logname)
 
 data_path="./logs"
+if not os.path.exists(data_path):
+    os.mkdir(data_path)
 log_path = os.path.join(data_path, logname+".log")
 logging.basicConfig(filename=log_path,level=logging.INFO,filemode='w')
 
@@ -52,7 +51,7 @@ class ReadOnlyClass(type):
 class Scrapper:
     __metaclass__ = ReadOnlyClass
 
-    def __init__(self, news_link='', source='', given_date='', page_num=''):
+    def __init__(self, news_link='', source='', given_date='', start_page='', page_num=''):
         self.NEWS_LINK = news_link
         self.SOURCE = source
         self.dump = {
@@ -63,6 +62,7 @@ class Scrapper:
         }
         self.given_date = given_date
         self.published_date = ''
+        self.start_page = start_page
         self.page_num = page_num
         
         if not os.path.exists(self.SOURCE):
@@ -162,8 +162,8 @@ class Scrapper:
         articleIdDict = {}
         
         # Iterate through each category
-        for i in range(0, self.page_num):
-            page_num = i+1
+        for i in range(self.start_page, self.page_num):
+            page_num = i
             suffix = '/page/'+str(page_num)
             for link, (topic, cat_nep, subtopic) in categoryDict.items():    
                 url = ''.join((self.NEWS_LINK, link+suffix))
@@ -204,15 +204,6 @@ class Scrapper:
                 date_dump[current_date].append(value)
             else:
                 date_dump[current_date] = [value]
-        
-        # Sort right here !!!
-#         logger.info("All the available items")
-#         for key_date,list_value in sorted(date_dump.items()):
-#             list_value = sorted(list_value, key = lambda x: x[2])
-#             for each in list_value:
-#                 logger.info("{},{}".format(key_date, each))
-            
-#         sys.exit(00)
         
         # Iterate through each date
         # Process latest date first
@@ -313,21 +304,26 @@ def main():
                         metavar="SOURCE", help="News source name")
     parser.add_argument("-d", "--given_date", default=None,
                         metavar="DATE", help="Date Format : 2020/04")
-    parser.add_argument("-p", "--page_num", default=15, type=int,
-                        metavar="PAGE", help="Number of pages to scrap")    
+    parser.add_argument("-sp", "--start_page", default=1, type=int,
+                        metavar="PAGE", help="Starting page to scrap")        
+    parser.add_argument("-ep", "--end_page", default=15, type=int,
+                        metavar="PAGE", help="End page to scrap")    
     
     args = parser.parse_args()
     
     news_link = args.news_link
     news_source_name = args.source
-    page_num = args.page_num
+    start_page = args.start_page
+    page_num = args.end_page
     # Take today's date if not given on arguments
     given_date = args.given_date if args.given_date else date.today().strftime("%Y/%m")
     
-    logger.info("Scrapping at least {} pages from each categories ahead of {} date".format(page_num, given_date))
+    logger.info("Scrapping at least {} pages from each categories ahead of {} date".format(page_num-start_page, given_date))
     
     start_time = time.time()
-    scrappy = Scrapper(news_link=news_link, source=news_source_name, given_date=given_date, page_num=page_num)
+    scrappy = Scrapper(news_link=news_link, source=news_source_name, 
+                       given_date=given_date, start_page=start_page, 
+                       page_num=page_num)
     scrappy.extractContent()
     seconds = time.time() - start_time
     
