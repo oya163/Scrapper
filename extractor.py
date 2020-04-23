@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 '''
     JSON extractor
     
@@ -13,8 +14,16 @@ import os
 import sys
 import json
 from pathlib import Path
+import importlib.util
+spec = importlib.util.spec_from_file_location("stemmer", "/home/oyashi/Documents/stemmer/nep_stemmer.py")
+stemmer = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(stemmer)
+
 
 def main():
+    nepstem = stemmer.NepStemmer(shabdakosh='/home/oyashi/Documents/stemmer/files/shabdakosh-words.txt', suffix_path='/home/oyashi/Documents/stemmer/files/suffix.txt')
+    
+    
     # Go through all folders
     paths = [str(x) for x in Path(sys.argv[1]).glob("**/*.json")]
     output_dir = sys.argv[2]
@@ -41,8 +50,10 @@ def main():
         
         print("Length of data : {}".format(len(data['category'])))
         for items, value in data['category'].items():
-            f.write(value['text']+"\n\n")
-            final_file.write(value['text']+"\n\n")
+            if len(value['text']) > 2:
+                stemmed_text = nepstem.stemmer(value['text'], clean=True)
+                f.write(stemmed_text+"\n\n")
+                final_file.write(stemmed_text+"\n\n")
         print("File written : {}".format(f.name))
         
         f.close()
